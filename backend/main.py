@@ -1,0 +1,361 @@
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
+from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from pydantic import BaseModel, EmailStr, field_validator
+from datetime import datetime
+import re
+from typing import List, Optional
+
+# Configuração do FastAPI
+app = FastAPI(
+    title="API de Clientes",
+    description="API para gerenciamento de clientes com validação de CPF/CNPJ",
+    version="1.0.0"
+)
+
+# Configuração CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Em produção, especifique os domínios permitidos
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Configuração do banco de dados SQLite
+SQLALCHEMY_DATABASE_URL = "sqlite:///./clientes.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Modelo SQLAlchemy
+class ClienteDB(Base):
+    __tablename__ = "clientes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False)
+    email = Column(String(100), unique=True, nullable=False, index=True)
+    cpf_cnpj = Column(String(18), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# Criar tabelas
+Base.metadata.create_all(bind=engine)
+
+# Pydantic Models
+class ClienteBase(BaseModel):
+    nome: str
+    email: EmailStr
+    cpf_cnpj: str
+    
+    @field_validator('nome')
+    @classmethod
+    def nome_deve_ter_minimo_caracteres(cls, v: str) -> str:
+        if len(v.strip()) < 2:
+            raise ValueError('Nome deve ter pelo menos 2 caracteres')
+        return v.strip()
+    
+    @field_validator('cpf_cnpj', mode='before')
+    @classmethod
+    def validar_cpf_cnpj(cls, v):
+        # Remove caracteres especiais
+        v = re.sub(r'[^\d]', '', v)
+        
+        if len(v) == 11:  # CPF
+            if not cls.validar_cpf(v):
+                raise ValueError('CPF inválido')
+        elif len(v) == 14:  # CNPJ
+            if not cls.validar_cnpj(v):
+                raise ValueError('CNPJ inválido')
+        else:
+            raise ValueError('CPF deve ter 11 dígitos ou CNPJ deve ter 14 dígitos')
+        
+        return v
+    
+    @staticmethod
+    def validar_cpf(cpf):
+        # Remove caracteres não numéricos
+        cpf = re.sub(r'[^\d]', '', cpf)
+        
+        if len(cpf) != 11:
+            return False
+        
+        # Verifica se todos os dígitos são iguais
+        if cpf == cpf[0] * 11:
+            return False
+        
+        # Validação do primeiro dígito verificador
+        soma = sum(int(cpf[i]) * (10 - i) for i in range(9))
+        resto = soma % 11
+        if resto < 2:
+            digito1 = 0
+        else:
+            digito1 = 11 - resto
+        
+        if int(cpf[9]) != digito1:
+            return False
+        
+        # Validação do segundo dígito verificador
+        soma = sum(int(cpf[i]) * (11 - i) for i in range(10))
+        resto = soma % 11
+        if resto < 2:
+            digito2 = 0
+        else:
+            digito2 = 11 - resto
+        
+        if int(cpf[10]) != digito2:
+            return False
+        
+        return True
+    
+    @staticmethod
+    def validar_cnpj(cnpj):
+        # Remove caracteres não numéricos
+        cnpj = re.sub(r'[^\d]', '', cnpj)
+        
+        if len(cnpj) != 14:
+            return False
+        
+        # Verifica se todos os dígitos são iguais
+        if cnpj == cnpj[0] * 14:
+            return False
+        
+        # Validação do primeiro dígito verificador
+        multiplicadores1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        soma = sum(int(cnpj[i]) * multiplicadores1[i] for i in range(12))
+        resto = soma % 11
+        if resto < 2:
+            digito1 = 0
+        else:
+            digito1 = 11 - resto
+        
+        if int(cnpj[12]) != digito1:
+            return False
+        
+        # Validação do segundo dígito verificador
+        multiplicadores2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        soma = sum(int(cnpj[i]) * multiplicadores2[i] for i in range(13))
+        resto = soma % 11
+        if resto < 2:
+            digito2 = 0
+        else:
+            digito2 = 11 - resto
+        
+        if int(cnpj[13]) != digito2:
+            return False
+        
+        return True
+
+class ClienteCreate(ClienteBase):
+    pass
+
+class ClienteUpdate(BaseModel):
+    nome: Optional[str] = None
+    email: Optional[str] = None
+    cpf_cnpj: Optional[str] = None
+    
+    model_config = {
+        "extra": "ignore",
+        "validate_assignment": False
+    }
+
+class ClienteResponse(BaseModel):
+    id: int
+    nome: str
+    email: str
+    cpf_cnpj: str
+    created_at: datetime
+    
+    model_config = {
+        "from_attributes": True
+    }
+
+# Dependency para obter a sessão do banco
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Endpoints CRUD
+
+@app.post("/clientes", response_model=ClienteResponse, status_code=status.HTTP_201_CREATED)
+def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
+    """Criar um novo cliente"""
+    try:
+        # Verificar se email já existe
+        db_cliente_email = db.query(ClienteDB).filter(ClienteDB.email == cliente.email).first()
+        if db_cliente_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email já cadastrado"
+            )
+        
+        # Verificar se CPF/CNPJ já existe
+        cpf_cnpj_limpo = re.sub(r'[^\d]', '', cliente.cpf_cnpj)
+        db_cliente_cpf_cnpj = db.query(ClienteDB).filter(
+            ClienteDB.cpf_cnpj == cpf_cnpj_limpo
+        ).first()
+        if db_cliente_cpf_cnpj:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CPF/CNPJ já cadastrado"
+            )
+        
+        # Criar novo cliente
+        db_cliente = ClienteDB(
+            nome=cliente.nome,
+            email=cliente.email,
+            cpf_cnpj=cpf_cnpj_limpo
+        )
+        db.add(db_cliente)
+        db.commit()
+        db.refresh(db_cliente)
+        
+        return db_cliente
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno do servidor: {str(e)}"
+        )
+
+@app.get("/clientes", response_model=List[ClienteResponse])
+def listar_clientes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Listar todos os clientes com paginação"""
+    try:
+        clientes = db.query(ClienteDB).offset(skip).limit(limit).all()
+        return clientes
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno do servidor: {str(e)}"
+        )
+
+@app.get("/clientes/{cliente_id}", response_model=ClienteResponse)
+def obter_cliente(cliente_id: int, db: Session = Depends(get_db)):
+    """Obter um cliente específico por ID"""
+    try:
+        cliente = db.query(ClienteDB).filter(ClienteDB.id == cliente_id).first()
+        if cliente is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente não encontrado"
+            )
+        return cliente
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno do servidor: {str(e)}"
+        )
+
+@app.put("/clientes/{cliente_id}", response_model=ClienteResponse)
+def atualizar_cliente(cliente_id: int, cliente: ClienteUpdate, db: Session = Depends(get_db)):
+    """Atualizar um cliente existente"""
+    try:
+        db_cliente = db.query(ClienteDB).filter(ClienteDB.id == cliente_id).first()
+        if db_cliente is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente não encontrado"
+            )
+        
+        # Atualizar campos fornecidos
+        if cliente.nome is not None:
+            db_cliente.nome = cliente.nome
+        
+        if cliente.email is not None:
+            # Verificar se novo email já existe (exceto para o cliente atual)
+            db_cliente_email = db.query(ClienteDB).filter(
+                ClienteDB.email == cliente.email,
+                ClienteDB.id != cliente_id
+            ).first()
+            if db_cliente_email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email já cadastrado por outro cliente"
+                )
+            db_cliente.email = cliente.email
+        
+        if cliente.cpf_cnpj is not None:
+            # Validação simples: apenas verifica se já existe outro cliente com o mesmo CPF/CNPJ
+            cpf_cnpj_limpo = re.sub(r'[^\d]', '', cliente.cpf_cnpj)
+            
+            # Verificar se novo CPF/CNPJ já existe (exceto para o cliente atual)
+            db_cliente_cpf_cnpj = db.query(ClienteDB).filter(
+                ClienteDB.cpf_cnpj == cpf_cnpj_limpo,
+                ClienteDB.id != cliente_id
+            ).first()
+            
+            if db_cliente_cpf_cnpj:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="CPF/CNPJ já cadastrado por outro cliente"
+                )
+            
+            db_cliente.cpf_cnpj = cpf_cnpj_limpo
+        
+        db.commit()
+        db.refresh(db_cliente)
+        return db_cliente
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno do servidor: {str(e)}"
+        )
+
+@app.delete("/clientes/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deletar_cliente(cliente_id: int, db: Session = Depends(get_db)):
+    """Deletar um cliente"""
+    try:
+        db_cliente = db.query(ClienteDB).filter(ClienteDB.id == cliente_id).first()
+        if db_cliente is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente não encontrado"
+            )
+        
+        db.delete(db_cliente)
+        db.commit()
+        return None
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno do servidor: {str(e)}"
+        )
+
+# Endpoint de health check
+@app.get("/health")
+def health_check():
+    """Verificar status da API"""
+    return {"status": "healthy", "timestamp": datetime.now()}
+
+# Endpoint raiz
+@app.get("/")
+def root():
+    """Página inicial da API"""
+    return {
+        "message": "API de Clientes - FastAPI",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "redoc": "/redoc"
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

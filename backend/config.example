@@ -1,0 +1,16 @@
+# Configurações da API
+API_HOST=0.0.0.0
+API_PORT=8000
+API_DEBUG=true
+
+# Configurações do Banco de Dados
+DATABASE_URL=sqlite:///./clientes.db
+
+# Configurações CORS (em produção, especifique os domínios permitidos)
+CORS_ORIGINS=["*"]
+CORS_ALLOW_CREDENTIALS=true
+CORS_ALLOW_METHODS=["*"]
+CORS_ALLOW_HEADERS=["*"]
+
+# Configurações de Log
+LOG_LEVEL=INFO

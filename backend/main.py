@@ -8,9 +8,15 @@ from datetime import datetime
 import re
 from typing import List, Optional
 import os
+import logging
+import json
 from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configuração do FastAPI
 app = FastAPI(
@@ -378,18 +384,57 @@ def root():
         "redoc": "/redoc"
     }
 
+# Endpoint para testar API key da OpenAI
+@app.get("/test-openai")
+def test_openai():
+    """Testa a conexão com a OpenAI API"""
+    try:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return {"status": "error", "message": "OpenAI API key não configurada"}
+        
+        # Mascarar API key para log
+        masked_key = f"{api_key[:10]}...{api_key[-4:]}" if len(api_key) > 14 else "***"
+        logger.info(f"Testando API key: {masked_key}")
+        
+        client = OpenAI(api_key=api_key)
+        
+        # Teste simples
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": "Responda apenas com 'OK'"}],
+            max_tokens=10
+        )
+        
+        return {
+            "status": "success", 
+            "message": "API key válida",
+            "response": response.choices[0].message.content.strip()
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao testar OpenAI: {str(e)}")
+        return {"status": "error", "message": f"Erro: {str(e)}"}
+
 # Endpoint para análise de notas fiscais
 @app.post("/analisar-nota", response_model=NotaFiscalResponse)
 def analisar_nota_fiscal(nota: NotaFiscalRequest):
     """Analisa uma nota fiscal usando OpenAI GPT-4"""
+    logger.info("Iniciando análise de nota fiscal")
+    
     try:
         # Verificar se a API key está configurada
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
+            logger.error("OpenAI API key não encontrada")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="OpenAI API key não configurada"
             )
+        
+        # Log da API key mascarada
+        masked_key = f"{api_key[:10]}...{api_key[-4:]}" if len(api_key) > 14 else "***"
+        logger.info(f"Usando API key: {masked_key}")
         
         # Configurar cliente OpenAI
         client = OpenAI(api_key=api_key)
@@ -409,6 +454,8 @@ def analisar_nota_fiscal(nota: NotaFiscalRequest):
         Responda apenas com o JSON válido, sem texto adicional.
         """
         
+        logger.info("Enviando requisição para OpenAI")
+        
         # Chamar OpenAI
         response = client.chat.completions.create(
             model="gpt-4o-mini",  # Usando GPT-4o-mini (mais econômico)
@@ -422,17 +469,19 @@ def analisar_nota_fiscal(nota: NotaFiscalRequest):
         
         # Extrair resposta
         resposta = response.choices[0].message.content.strip()
+        logger.info(f"Resposta da OpenAI: {resposta}")
         
         # Tentar fazer parse da resposta JSON
         try:
-            import json
             dados = json.loads(resposta)
+            logger.info("JSON parsed com sucesso")
             
             # Validar campos obrigatórios
             if 'categoria' not in dados or 'resumo' not in dados:
+                logger.warning("Resposta da OpenAI não contém campos obrigatórios")
                 raise ValueError("Resposta da OpenAI não contém campos obrigatórios")
             
-            return NotaFiscalResponse(
+            result = NotaFiscalResponse(
                 categoria=dados.get('categoria', 'Não categorizado'),
                 resumo=dados.get('resumo', 'Análise não disponível'),
                 valor_total=dados.get('valor_total'),
@@ -440,11 +489,16 @@ def analisar_nota_fiscal(nota: NotaFiscalRequest):
                 cnpj_emissor=dados.get('cnpj_emissor')
             )
             
-        except json.JSONDecodeError:
+            logger.info("Análise concluída com sucesso")
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Erro ao fazer parse do JSON: {str(e)}")
+            logger.error(f"Resposta que causou erro: {resposta}")
             # Se não conseguir fazer parse do JSON, criar resposta básica
             return NotaFiscalResponse(
                 categoria="papelaria",
-                resumo="Compra de material escolar: canetas e cadernos",
+                resumo="Compra de material escolar: canetas e cadernos (fallback - erro no parse)",
                 valor_total=None,
                 data_emissao=None,
                 cnpj_emissor=None
@@ -453,6 +507,7 @@ def analisar_nota_fiscal(nota: NotaFiscalRequest):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Erro geral ao analisar nota fiscal: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao analisar nota fiscal: {str(e)}"

@@ -12,6 +12,7 @@ Uma API completa para gerenciamento de clientes com validação de CPF/CNPJ bras
 - ✅ Documentação automática (Swagger/ReDoc)
 - ✅ Tratamento de erros robusto
 - ✅ Validação de dados com Pydantic
+- ✅ Integração com N8N via webhook
 
 ## 📋 Pré-requisitos
 
@@ -194,6 +195,46 @@ Analisa notas fiscais usando OpenAI GPT-4o-mini para extrair informações estru
 - Configure a variável de ambiente `OPENAI_API_KEY` com sua chave da OpenAI
 - O modelo usado é GPT-4o-mini para economia de custos
 - Análise automática de categorias, valores e datas
+
+## 🔗 Integração N8N
+
+### Webhook Automático para Novos Clientes
+
+Quando um novo cliente é criado via `POST /clientes`, a API automaticamente envia os dados para um webhook N8N configurado.
+
+#### Configuração:
+
+1. **Variável de Ambiente**:
+```bash
+N8N_WEBHOOK_URL=https://n8nwebhook.creatorsia.com/webhook/cliente-novo
+```
+
+2. **Dados Enviados**:
+```json
+{
+  "id": 123,
+  "nome": "João Silva",
+  "email": "joao@email.com", 
+  "cpf_cnpj": "12345678901",
+  "created_at": "2024-01-01T10:00:00"
+}
+```
+
+#### Características:
+- ✅ **Timeout**: 5 segundos
+- ✅ **Tratamento de erro**: Não falha criação do cliente se webhook estiver offline
+- ✅ **Logging**: Sucesso/falha são registrados no console
+- ✅ **Assíncrono**: Não bloqueia a resposta da API
+
+#### Logs de Exemplo:
+```
+✅ N8N Webhook chamado com sucesso para João Silva
+   Status: 200
+```
+
+```
+⚠️ Erro ao chamar N8N webhook: timeout
+```
 
 ## 🔧 Configurações
 

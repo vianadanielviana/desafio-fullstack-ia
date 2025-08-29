@@ -10,9 +10,12 @@ from typing import List, Optional
 import os
 import logging
 import json
+import httpx
 from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()
+
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://n8nwebhook.creatorsia.com/webhook/cliente-novo")
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -210,7 +213,7 @@ def get_db():
 # Endpoints CRUD
 
 @app.post("/clientes", response_model=ClienteResponse, status_code=status.HTTP_201_CREATED)
-def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
+async def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
     """Criar um novo cliente"""
     try:
         # Verificar se email já existe
@@ -241,6 +244,25 @@ def criar_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
         db.add(db_cliente)
         db.commit()
         db.refresh(db_cliente)
+        
+        # Chamar webhook do N8N
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    N8N_WEBHOOK_URL,
+                    json={
+                        "id": db_cliente.id,
+                        "nome": db_cliente.nome,
+                        "email": db_cliente.email,
+                        "cpf_cnpj": db_cliente.cpf_cnpj,
+                        "created_at": str(db_cliente.created_at)
+                    },
+                    timeout=5.0
+                )
+                print(f"✅ N8N Webhook chamado com sucesso para {db_cliente.nome}")
+                print(f"   Status: {response.status_code}")
+        except Exception as e:
+            print(f"⚠️ Erro ao chamar N8N webhook: {e}")
         
         return db_cliente
     

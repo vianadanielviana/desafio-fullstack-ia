@@ -471,6 +471,11 @@ def analisar_nota_fiscal(nota: NotaFiscalRequest):
         resposta = response.choices[0].message.content.strip()
         logger.info(f"Resposta da OpenAI: {resposta}")
         
+        # Limpar markdown se presente (```json ... ```)
+        if resposta.startswith("```json"):
+            resposta = resposta.replace("```json", "").replace("```", "").strip()
+            logger.info(f"Resposta limpa: {resposta}")
+        
         # Tentar fazer parse da resposta JSON
         try:
             dados = json.loads(resposta)

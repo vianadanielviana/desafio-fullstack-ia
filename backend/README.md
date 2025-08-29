@@ -64,6 +64,7 @@ A API estará disponível em: `http://localhost:8000`
 |--------|----------|-----------|
 | `GET` | `/` | Página inicial |
 | `GET` | `/health` | Status da API |
+| `POST` | `/analisar-nota` | Analisar nota fiscal com IA |
 
 ## 📝 Modelo de Dados
 
@@ -149,11 +150,50 @@ curl -X PUT "http://localhost:8000/clientes/1" \
 curl -X DELETE "http://localhost:8000/clientes/1"
 ```
 
+### Analisar Nota Fiscal
+
+```bash
+curl -X POST "http://localhost:8000/analisar-nota" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "texto": "NOTA FISCAL ELETRÔNICA - Nº 001 - Data: 15/08/2024 - Supermercado ABC - CNPJ: 12.345.678/0001-90 - Itens: Arroz 5kg R$ 25,00, Feijão 1kg R$ 8,50, Total: R$ 33,50"
+  }'
+```
+
 ## 🗃️ Banco de Dados
 
 - **Tipo**: SQLite
 - **Arquivo**: `clientes.db` (criado automaticamente)
 - **Localização**: Pasta raiz do projeto
+
+## 🤖 Análise de Notas Fiscais com IA
+
+### Endpoint: `POST /analisar-nota`
+
+Analisa notas fiscais usando OpenAI GPT-4o-mini para extrair informações estruturadas.
+
+#### Request:
+```json
+{
+  "texto": "Texto da nota fiscal para análise"
+}
+```
+
+#### Response:
+```json
+{
+  "categoria": "alimentação",
+  "resumo": "Compra de produtos alimentícios no supermercado",
+  "valor_total": 45.67,
+  "data_emissao": "15/08/2024",
+  "cnpj_emissor": "12.345.678/0001-90"
+}
+```
+
+#### Configuração:
+- Configure a variável de ambiente `OPENAI_API_KEY` com sua chave da OpenAI
+- O modelo usado é GPT-4o-mini para economia de custos
+- Análise automática de categorias, valores e datas
 
 ## 🔧 Configurações
 

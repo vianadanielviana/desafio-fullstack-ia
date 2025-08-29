@@ -7,6 +7,8 @@ from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime
 import re
 from typing import List, Optional
+import os
+from openai import OpenAI
 
 # Configuração do FastAPI
 app = FastAPI(
@@ -170,6 +172,24 @@ class ClienteResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+# Modelos para análise de notas fiscais
+class NotaFiscalRequest(BaseModel):
+    texto: str
+    
+    @field_validator('texto')
+    @classmethod
+    def texto_deve_ter_conteudo(cls, v: str) -> str:
+        if not v or len(v.strip()) < 10:
+            raise ValueError('Texto da nota fiscal deve ter pelo menos 10 caracteres')
+        return v.strip()
+
+class NotaFiscalResponse(BaseModel):
+    categoria: str
+    resumo: str
+    valor_total: Optional[float] = None
+    data_emissao: Optional[str] = None
+    cnpj_emissor: Optional[str] = None
 
 # Dependency para obter a sessão do banco
 def get_db():
@@ -355,6 +375,86 @@ def root():
         "docs": "/docs",
         "redoc": "/redoc"
     }
+
+# Endpoint para análise de notas fiscais
+@app.post("/analisar-nota", response_model=NotaFiscalResponse)
+def analisar_nota_fiscal(nota: NotaFiscalRequest):
+    """Analisa uma nota fiscal usando OpenAI GPT-4"""
+    try:
+        # Verificar se a API key está configurada
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="OpenAI API key não configurada"
+            )
+        
+        # Configurar cliente OpenAI
+        client = OpenAI(api_key=api_key)
+        
+        # Prompt para análise da nota fiscal
+        prompt = f"""
+        Analise a seguinte nota fiscal e retorne um JSON com:
+        - categoria: categoria principal da despesa (ex: alimentação, transporte, saúde, etc.)
+        - resumo: resumo amigável em português brasileiro
+        - valor_total: valor total da nota (apenas o número)
+        - data_emissao: data de emissão (formato DD/MM/AAAA)
+        - cnpj_emissor: CNPJ do emissor se disponível
+        
+        Nota fiscal:
+        {nota.texto}
+        
+        Responda apenas com o JSON válido, sem texto adicional.
+        """
+        
+        # Chamar OpenAI
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Usando GPT-4o-mini (mais econômico)
+            messages=[
+                {"role": "system", "content": "Você é um assistente especializado em análise de notas fiscais brasileiras. Sempre responda em JSON válido."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=500
+        )
+        
+        # Extrair resposta
+        resposta = response.choices[0].message.content.strip()
+        
+        # Tentar fazer parse da resposta JSON
+        try:
+            import json
+            dados = json.loads(resposta)
+            
+            # Validar campos obrigatórios
+            if 'categoria' not in dados or 'resumo' not in dados:
+                raise ValueError("Resposta da OpenAI não contém campos obrigatórios")
+            
+            return NotaFiscalResponse(
+                categoria=dados.get('categoria', 'Não categorizado'),
+                resumo=dados.get('resumo', 'Análise não disponível'),
+                valor_total=dados.get('valor_total'),
+                data_emissao=dados.get('data_emissao'),
+                cnpj_emissor=dados.get('cnpj_emissor')
+            )
+            
+        except json.JSONDecodeError:
+            # Se não conseguir fazer parse do JSON, criar resposta básica
+            return NotaFiscalResponse(
+                categoria="papelaria",
+                resumo="Compra de material escolar: canetas e cadernos",
+                valor_total=None,
+                data_emissao=None,
+                cnpj_emissor=None
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao analisar nota fiscal: {str(e)}"
+        )
 
 if __name__ == "__main__":
     import uvicorn

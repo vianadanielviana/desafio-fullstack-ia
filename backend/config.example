@@ -14,3 +14,6 @@ CORS_ALLOW_HEADERS=["*"]
 
 # Configurações de Log
 LOG_LEVEL=INFO
+
+# OpenAI API
+OPENAI_API_KEY=sua_chave_api_aqui

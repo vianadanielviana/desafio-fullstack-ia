@@ -96,50 +96,66 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-4xl font-bold text-center mb-8 text-gray-800">
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
+      <div className="container py-4">
+        <h1 className="text-center mb-4 display-4 fw-bold text-dark">
           Sistema de Gestão de Clientes
         </h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="row g-4">
           {/* Client Form */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-700">
-              {editingClient ? 'Editar Cliente' : 'Novo Cliente'}
-            </h2>
-            <ClientForm
-              onSubmit={handleClientSubmit}
-              editingClient={editingClient}
-              onCancel={handleCancelEdit}
-            />
+          <div className="col-lg-6">
+            <div className="card shadow-sm">
+              <div className="card-body">
+                <h2 className="card-title h4 mb-3">
+                  {editingClient ? 'Editar Cliente' : 'Novo Cliente'}
+                </h2>
+                <ClientForm
+                  onSubmit={handleClientSubmit}
+                  editingClient={editingClient}
+                  onCancel={handleCancelEdit}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Client List */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-700">
-              Lista de Clientes
-            </h2>
-            {loading ? (
-              <div className="flex justify-center items-center h-32">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="col-lg-6">
+            <div className="card shadow-sm">
+              <div className="card-body">
+                <h2 className="card-title h4 mb-3">
+                  Lista de Clientes
+                </h2>
+                {loading ? (
+                  <div className="d-flex justify-content-center align-items-center" style={{ height: '200px' }}>
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <ClientTable
+                    clients={clients}
+                    onEdit={handleEditClient}
+                    onDelete={handleDeleteClient}
+                  />
+                )}
               </div>
-            ) : (
-              <ClientTable
-                clients={clients}
-                onEdit={handleEditClient}
-                onDelete={handleDeleteClient}
-              />
-            )}
+            </div>
           </div>
         </div>
 
         {/* Invoice Analysis Section */}
-        <div className="mt-8 bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-700">
-            Análise de Notas Fiscais com IA
-          </h2>
-          <InvoiceAnalysis />
+        <div className="row mt-4">
+          <div className="col-12">
+            <div className="card shadow-sm">
+              <div className="card-body">
+                <h2 className="card-title h4 mb-3">
+                  Análise de Notas Fiscais com IA
+                </h2>
+                <InvoiceAnalysis />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

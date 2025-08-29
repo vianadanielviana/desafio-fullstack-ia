@@ -55,144 +55,22 @@ const InvoiceAnalysis = () => {
     }).format(value)
   }
 
-  const getCategoryColor = (categoria) => {
-    const colors = {
-      'alimentação': 'bg-green-100 text-green-800',
-      'saúde': 'bg-blue-100 text-blue-800',
-      'transporte': 'bg-yellow-100 text-yellow-800',
-      'educação': 'bg-purple-100 text-purple-800',
-      'vestuário': 'bg-pink-100 text-pink-800',
-      'eletrônicos': 'bg-indigo-100 text-indigo-800',
-      'casa': 'bg-orange-100 text-orange-800',
-      'papelaria': 'bg-gray-100 text-gray-800',
-      'outros': 'bg-red-100 text-red-800'
+  const getCategoryBadgeClass = (categoria) => {
+    const classes = {
+      'alimentação': 'badge bg-success',
+      'saúde': 'badge bg-info',
+      'transporte': 'badge bg-warning text-dark',
+      'educação': 'badge bg-primary',
+      'vestuário': 'badge bg-danger',
+      'eletrônicos': 'badge bg-dark',
+      'casa': 'badge bg-warning text-dark',
+      'papelaria': 'badge bg-secondary',
+      'outros': 'badge bg-secondary'
     }
-    return colors[categoria.toLowerCase()] || colors['outros']
+    return classes[categoria?.toLowerCase()] || classes['outros']
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Input Section */}
-      <div>
-        <label htmlFor="invoice-text" className="block text-sm font-medium text-gray-700 mb-2">
-          Texto da Nota Fiscal
-        </label>
-        <textarea
-          id="invoice-text"
-          value={invoiceText}
-          onChange={(e) => setInvoiceText(e.target.value)}
-          rows={8}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Cole aqui o texto da nota fiscal que deseja analisar...&#10;&#10;Exemplo:&#10;NOTA FISCAL ELETRONICA&#10;Supermercado ABC Ltda&#10;CNPJ: 12.345.678/0001-90&#10;Data: 15/08/2024&#10;&#10;Itens:&#10;- Arroz 5kg: R$ 25,00&#10;- Feijão 1kg: R$ 8,50&#10;&#10;Total: R$ 33,50"
-        />
-        {error && (
-          <p className="mt-1 text-sm text-red-600">{error}</p>
-        )}
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex gap-4">
-        <button
-          onClick={handleAnalyze}
-          disabled={loading || !invoiceText.trim()}
-          className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Analisando com IA...
-            </span>
-          ) : (
-            '🤖 Analisar com IA'
-          )}
-        </button>
-        
-        <button
-          onClick={handleClear}
-          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        >
-          Limpar
-        </button>
-      </div>
-
-      {/* Results Section */}
-      {analysis && (
-        <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-            <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Análise da IA
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Category */}
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Categoria</label>
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getCategoryColor(analysis.categoria)}`}>
-                {analysis.categoria}
-              </span>
-            </div>
-
-            {/* Total Value */}
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Valor Total</label>
-              <div className="text-lg font-semibold text-gray-900">
-                {formatCurrency(analysis.valor_total)}
-              </div>
-            </div>
-
-            {/* Issue Date */}
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Data de Emissão</label>
-              <div className="text-gray-900">
-                {analysis.data_emissao || 'N/A'}
-              </div>
-            </div>
-
-            {/* CNPJ */}
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <label className="block text-sm font-medium text-gray-600 mb-1">CNPJ do Emissor</label>
-              <div className="text-gray-900 font-mono text-sm">
-                {analysis.cnpj_emissor || 'N/A'}
-              </div>
-            </div>
-          </div>
-
-          {/* Summary */}
-          <div className="mt-4 bg-white p-4 rounded-lg shadow-sm">
-            <label className="block text-sm font-medium text-gray-600 mb-2">Resumo</label>
-            <p className="text-gray-900 leading-relaxed">
-              {analysis.resumo}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Sample Data Section */}
-      <div className="border-t pt-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">💡 Exemplo de Nota Fiscal</h3>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800 mb-2">
-            Copie e cole este exemplo para testar a análise:
-          </p>
-          <div className="bg-white p-3 rounded border text-sm font-mono text-gray-700">
-            NOTA FISCAL ELETRONICA<br/>
-            Farmácia Saúde & Vida<br/>
-            CNPJ: 98.765.432/0001-10<br/>
-            Data: 20/08/2024<br/>
-            <br/>
-            Medicamentos:<br/>
-            - Dipirona 500mg: R$ 12,90<br/>
-            - Vitamina C: R$ 18,50<br/>
-            <br/>
-            Total: R$ 31,40
-          </div>
-          <button
-            onClick={() => setInvoiceText(`NOTA FISCAL ELETRONICA
+  const exampleInvoice = `NOTA FISCAL ELETRONICA
 Farmácia Saúde & Vida
 CNPJ: 98.765.432/0001-10
 Data: 20/08/2024
@@ -201,11 +79,152 @@ Medicamentos:
 - Dipirona 500mg: R$ 12,90
 - Vitamina C: R$ 18,50
 
-Total: R$ 31,40`)}
-            className="mt-2 text-blue-600 text-sm hover:text-blue-800"
-          >
-            📋 Usar este exemplo
-          </button>
+Total: R$ 31,40`
+
+  return (
+    <div>
+      {/* Input Section */}
+      <div className="mb-4">
+        <label htmlFor="invoice-text" className="form-label">
+          Texto da Nota Fiscal
+        </label>
+        <textarea
+          id="invoice-text"
+          value={invoiceText}
+          onChange={(e) => setInvoiceText(e.target.value)}
+          rows={8}
+          className="form-control"
+          placeholder={`Cole aqui o texto da nota fiscal que deseja analisar...
+
+Exemplo:
+${exampleInvoice}`}
+        />
+        {error && (
+          <div className="form-text text-danger">{error}</div>
+        )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="d-grid gap-2 d-md-flex justify-content-md-start mb-4">
+        <button
+          onClick={handleAnalyze}
+          disabled={loading || !invoiceText.trim()}
+          className="btn btn-primary"
+        >
+          {loading ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              Analisando com IA...
+            </>
+          ) : (
+            <>🤖 Analisar com IA</>
+          )}
+        </button>
+        
+        <button
+          onClick={handleClear}
+          className="btn btn-outline-secondary"
+        >
+          Limpar
+        </button>
+      </div>
+
+      {/* Results Section */}
+      {analysis && (
+        <div className="card border-success">
+          <div className="card-header bg-light">
+            <h5 className="card-title mb-0">
+              <span className="text-success me-2">✓</span>
+              Análise da IA
+            </h5>
+          </div>
+          <div className="card-body">
+            <div className="row g-3">
+              {/* Category */}
+              <div className="col-md-6">
+                <div className="card h-100">
+                  <div className="card-body text-center">
+                    <h6 className="card-subtitle mb-2 text-muted">Categoria</h6>
+                    <span className={getCategoryBadgeClass(analysis.categoria)}>
+                      {analysis.categoria}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Value */}
+              <div className="col-md-6">
+                <div className="card h-100">
+                  <div className="card-body text-center">
+                    <h6 className="card-subtitle mb-2 text-muted">Valor Total</h6>
+                    <div className="h5 mb-0 text-success fw-bold">
+                      {formatCurrency(analysis.valor_total)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Issue Date */}
+              <div className="col-md-6">
+                <div className="card h-100">
+                  <div className="card-body text-center">
+                    <h6 className="card-subtitle mb-2 text-muted">Data de Emissão</h6>
+                    <div className="text-dark">
+                      {analysis.data_emissao || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CNPJ */}
+              <div className="col-md-6">
+                <div className="card h-100">
+                  <div className="card-body text-center">
+                    <h6 className="card-subtitle mb-2 text-muted">CNPJ do Emissor</h6>
+                    <code className="text-dark">
+                      {analysis.cnpj_emissor || 'N/A'}
+                    </code>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="mt-3">
+              <div className="card">
+                <div className="card-body">
+                  <h6 className="card-subtitle mb-2 text-muted">Resumo</h6>
+                  <p className="card-text mb-0">
+                    {analysis.resumo}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sample Data Section */}
+      <div className="mt-4 pt-4 border-top">
+        <h5 className="mb-3">💡 Exemplo de Nota Fiscal</h5>
+        <div className="alert alert-info">
+          <p className="mb-2">
+            <strong>Copie e cole este exemplo para testar a análise:</strong>
+          </p>
+          <div className="card">
+            <div className="card-body">
+              <pre className="mb-3 text-dark" style={{ fontSize: '0.9rem' }}>
+                {exampleInvoice}
+              </pre>
+              <button
+                type="button"
+                onClick={() => setInvoiceText(exampleInvoice)}
+                className="btn btn-sm btn-outline-primary"
+              >
+                📋 Usar este exemplo
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

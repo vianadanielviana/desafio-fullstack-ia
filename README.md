@@ -271,7 +271,7 @@ curl -X POST http://localhost:8000/analisar-nota \
 
 - 🐱 GitHub: [@vianadanielviana](https://github.com/vianadanielviana)
 - 📧 Email: viana.vianadaniel@outlook.com
-- 🔗 LinkedIn: [Daniel Viana](https://www.linkedin.com/in/danielviana)
+- 🔗 LinkedIn: [Daniel Viana](https://linkedin.com/in/danielpvianaa)
 
 ## 📄 Licença
 
